@@ -655,20 +655,20 @@ int switchtec_hard_reset(struct switchtec_dev *dev)
 ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
 {
     int i;
-    int SWITCHTEC_LOG_ENTRY_SIZE = 32;
+    int SWITCHTEC_LOG_ENTRY_SIZE = 8;
     long time, nanos, micros, millis, secs, mins, hours, days;
+    int *entries = (int *)buf;
 
     for (i = 0; (i < count) && (i + SWITCHTEC_LOG_ENTRY_SIZE - 1 < count); i += SWITCHTEC_LOG_ENTRY_SIZE) {
         // Timestamp is first 2 DWORDS
-        time = buf[i] | (buf[i+1] << 8) | (buf[i+2] << 16) | (buf[i+3] << 24)
-                    | (buf[i+4] << 32) | (buf[i+5] << 40) | (buf[i+5] << 48) | (buf[i+5] << 56);
+        time = entries[i];
                 nanos = (int) (time % 1000);
                 time = time / 1000;
                 micros = (int) (time % 1000);
                 time = time / 1000;
                 millis = (int) (time % 1000);
                 time = time / 1000;
-                second = (int) (time % 60);
+                secs = (int) (time % 60);
                 time = time / 60;
                 mins = (int) (time % 60);
                 time = time / 60;

@@ -919,10 +919,9 @@ static int log_dump(int argc, char **argv)
 		{"type", 't', "TYPE", CFG_CHOICES, &cfg.type,
 		  required_argument,
 		 "log type to dump", .choices=types},
-        {"parse", .cfg_type=CFG_FD_RD, .value_addr=&cfg.map_fd,
+        {"parse", .cfg_type=CFG_FD_RD, .value_addr=&cfg.data_fd,
 		  .argument_type=optional_positional,
-		  .help="parse log output using specified *.data file (APP log only)",
-          .type=SWITCHTEC_LOG_RAM},
+		  .help="parse log output using specified *.data file (APP log only)"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_DESC_LOG_DUMP, opts, &cfg, sizeof(cfg));
