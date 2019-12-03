@@ -652,7 +652,83 @@ int switchtec_hard_reset(struct switchtec_dev *dev)
 			     NULL, 0);
 }
 
-static int log_a_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
+ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
+{
+    int i;
+    int SWITCHTEC_LOG_ENTRY_SIZE = 32;
+    long time, nanos, micros, millis, secs, mins, hours, days;
+
+    for (i = 0; (i < count) && (i + SWITCHTEC_LOG_ENTRY_SIZE - 1 < count); i += SWITCHTEC_LOG_ENTRY_SIZE) {
+        // Timestamp is first 2 DWORDS
+        time = buf[i] | (buf[i+1] << 8) | (buf[i+2] << 16) | (buf[i+3] << 24)
+                    | (buf[i+4] << 32) | (buf[i+5] << 40) | (buf[i+5] << 48) | (buf[i+5] << 56);
+                nanos = (int) (time % 1000);
+                time = time / 1000;
+                micros = (int) (time % 1000);
+                time = time / 1000;
+                millis = (int) (time % 1000);
+                time = time / 1000;
+                second = (int) (time % 60);
+                time = time / 60;
+                mins = (int) (time % 60);
+                time = time / 60;
+                hours = (int) (time % 24);
+                days = (int) time / 24;
+                //String tsString = Integer.toString(days) + " " + String.format("%02d", hours)
+                  //      + ":" + String.format("%02d", min) + ":" + String.format("%02d", second)
+                    //    + "." + String.format("%03d", millis) + "," + String.format("%03d", micros)
+                      //   + "," + String.format("%03d", nanos);
+        // Code and sev is next dword - 
+        /*
+        int severity = (errSevAndIds >> 28) & 0xFF;
+            switch (severity) {
+                case 5:
+                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.LOWEST);
+                    break;
+                case 4:
+                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.LOW);
+                    break;
+                case 3:
+                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.MEDIUM);
+                    break;
+                case 2:
+                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.HIGH);
+                    break;
+                case 1:
+                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.HIGHEST);
+                    break;
+                case 0:
+                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.DISABLED);
+                    break;
+                default:
+                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.UNKNOWN);
+                    break;
+            }
+
+            String eventDataStr = "";
+            int eventID = (errSevAndIds >> 16) & 0xFFF;
+            int errorID = errSevAndIds & 0xFFFF;
+            if (supportsParsing && manager != null) {
+                String errorMessage = manager.fwLogDefLookUp(eventID, errorID);
+                errorInfo.setEventID(eventID);
+                errorInfo.setErrorID(errorID);
+
+                if (errorMessage != null) {
+                    errorInfo.setErrorMessage(errorMessage);
+                } else {
+                    errorInfo.setErrorMessage("<Unknown Error ID>");
+                }
+                fwLogInfo.setEventID(errorInfo);
+            } else {
+                eventDataStr = String.format("0x%08X ", (errSevAndIds & 0xFFFFFFF));
+            }
+        */
+        // final 5 are args
+    }
+    return -1;
+}
+
+static int log_a_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd, int data_fd)
 {
 	int ret;
 	int read = 0;
@@ -670,9 +746,15 @@ static int log_a_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
 		if (ret)
 			return -1;
 
-		ret = write(fd, res.data, sizeof(*res.data) * res.hdr.count);
-		if (ret < 0)
-			return ret;
+		if (data_fd == -1) {
+            ret = write(fd, res.data, sizeof(*res.data) * res.hdr.count);
+            if (ret < 0)
+                return ret;
+        } else {
+            ret = write_parsed_log(fd, res.data, sizeof(*res.data) * res.hdr.count, data_fd);
+            if (ret < 0)
+                return ret;
+        }
 
 		read += le32toh(res.hdr.count);
 		cmd.start = res.hdr.next_start;
@@ -752,13 +834,13 @@ static int log_c_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
  */
 int switchtec_log_to_file(struct switchtec_dev *dev,
 			  enum switchtec_log_type type,
-			  int fd)
+			  int fd, int data_fd)
 {
 	switch (type) {
 	case SWITCHTEC_LOG_RAM:
-		return log_a_to_file(dev, MRPC_FWLOGRD_RAM, fd);
+		return log_a_to_file(dev, MRPC_FWLOGRD_RAM, fd, data_fd);
 	case SWITCHTEC_LOG_FLASH:
-		return log_a_to_file(dev, MRPC_FWLOGRD_FLASH, fd);
+		return log_a_to_file(dev, MRPC_FWLOGRD_FLASH, fd, data_fd);
 	case SWITCHTEC_LOG_MEMLOG:
 		return log_b_to_file(dev, MRPC_FWLOGRD_MEMLOG, fd);
 	case SWITCHTEC_LOG_REGS:
