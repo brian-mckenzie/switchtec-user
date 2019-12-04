@@ -128,7 +128,7 @@ static int set_gen_variant(struct switchtec_dev * dev)
 	dev->boot_phase = SWITCHTEC_BOOT_PHASE_FW;
 	dev->gen = SWITCHTEC_GEN_UNKNOWN;
 	dev->var = SWITCHTEC_VAR_UNKNOWN;
-	dev->device_id = dev->ops->get_device_id(dev);
+	dev->device_id = 0x4100;//dev->ops->get_device_id(dev);
 
 	while (id->device_id) {
 		if (id->device_id == dev->device_id) {
@@ -656,13 +656,15 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
 {
     int i;
     int SWITCHTEC_LOG_ENTRY_SIZE = 8;
-    unsigned int time, nanos, micros, millis, secs, mins, hours, days;
-    unsigned int *entries = (int *)buf;
-    char *event_str, *event_code, *event_sev, *out_str;
+    unsigned long time;
+    unsigned int nanos, micros, millis, secs, mins, hours, days;
+    unsigned int *entries = (unsigned int *)buf;
+    char *event_str, *event_code, *event_sev;
+    char out_str[128];
 
     for (i = 0; (i < count) && (i + SWITCHTEC_LOG_ENTRY_SIZE - 1 < count); i += SWITCHTEC_LOG_ENTRY_SIZE) {
         // Timestamp is first 2 DWORDS
-        time = entries[i];
+        time = (entries[i] << 32 | entries[i+1])*10;
         nanos = (int) (time % 1000);
         time = time / 1000;
         micros = (int) (time % 1000);
@@ -721,11 +723,11 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
                 eventDataStr = String.format("0x%08X ", (errSevAndIds & 0xFFFFFFF));
             }
         */
-        sprintf(out_str, "%d:%02d:%02d:%02d.%03d,%03d,%03d - ", days, hours, mins, secs, millis, micros, nanos);
+        sprintf(&out_str[0], "%d:%02d:%02d:%02d.%03d,%03d,%03d - ", days, hours, mins, secs, millis, micros, nanos);
         write(fd, out_str, strlen(out_str));
         //sprintf(out_str, event_str, entries[i + 3], entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
         //write(fd, out_str, strlen(out_str));
-        sprintf(out_str, "\r\n");
+        sprintf(&out_str[0], "\r\n");
         write(fd, out_str, strlen(out_str));
     }
     return -1;

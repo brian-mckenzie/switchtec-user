@@ -903,12 +903,11 @@ static int log_dump(int argc, char **argv)
 	static struct {
 		struct switchtec_dev *dev;
 		int out_fd;
-		int data_fd;
 		const char *out_filename;
 		unsigned type;
+		int data_fd;
 	} cfg = {
-		.type = SWITCHTEC_LOG_RAM,
-        .data_fd = -1
+		.type = SWITCHTEC_LOG_RAM
 	};
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
@@ -916,12 +915,14 @@ static int log_dump(int argc, char **argv)
 		  .argument_type=optional_positional,
 		  .force_default="switchtec.log",
 		  .help="image file to display information for"},
+        {"parse", .cfg_type=CFG_FD_RD, .value_addr=&cfg.data_fd,
+      		  .argument_type=optional_positional,
+      		  .force_default="osf.data",
+         // required_argument,
+		  .help="parse log output using specified *.data file (APP log only)"},
 		{"type", 't', "TYPE", CFG_CHOICES, &cfg.type,
 		  required_argument,
 		 "log type to dump", .choices=types},
-        {"parse", .cfg_type=CFG_FD_RD, .value_addr=&cfg.data_fd,
-		  .argument_type=optional_positional,
-		  .help="parse log output using specified *.data file (APP log only)"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_DESC_LOG_DUMP, opts, &cfg, sizeof(cfg));
