@@ -661,6 +661,10 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
     unsigned int *entries = (unsigned int *)buf;
     char *event_str, *event_code, *event_sev;
     char out_str[128];
+    unsigned int mod_id;
+    unsigned int log_evt_code;
+    unsigned int log_sev;
+
 
     for (i = 0; (i < count) && (i + SWITCHTEC_LOG_ENTRY_SIZE - 1 < count); i += SWITCHTEC_LOG_ENTRY_SIZE) {
         // Timestamp is first 2 DWORDS
@@ -679,31 +683,34 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
         days = (int) time / 24;
 
         // Code and sev is next dword - 
+        log_evt_code = entries[i+2] & 0x0000FFFF;
+        mod_id = (entries[i+2] >> 16) & 0xFFF;
+        log_sev = (entries[i+2] >> 28) & 0xF;
+
+        switch (log_sev) {
+            case 5:
+                sprintf(event_sev, "LOWEST");
+                break;
+            case 4:
+                sprintf(event_sev, "LOW");
+                break;
+            case 3:
+                sprintf(event_sev, "MEDIUM");
+                break;
+            case 2:
+                sprintf(event_sev, "HIGH");
+                break;
+            case 1:
+                sprintf(event_sev, "HIGHEST");
+                break;
+            case 0:
+                sprintf(event_sev, "DISABLED");
+                break;
+            default:
+                sprintf(event_sev, "UNKNOWN");
+                break;
+        }
         /*
-        int severity = (errSevAndIds >> 28) & 0xFF;
-            switch (severity) {
-                case 5:
-                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.LOWEST);
-                    break;
-                case 4:
-                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.LOW);
-                    break;
-                case 3:
-                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.MEDIUM);
-                    break;
-                case 2:
-                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.HIGH);
-                    break;
-                case 1:
-                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.HIGHEST);
-                    break;
-                case 0:
-                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.DISABLED);
-                    break;
-                default:
-                    fwLogInfo.setSeverity(FwLogInformation.SeverityType.UNKNOWN);
-                    break;
-            }
 
             String eventDataStr = "";
             int eventID = (errSevAndIds >> 16) & 0xFFF;
@@ -723,11 +730,14 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
                 eventDataStr = String.format("0x%08X ", (errSevAndIds & 0xFFFFFFF));
             }
         */
-        sprintf(&out_str[0], "%d:%02d:%02d:%02d.%03d,%03d,%03d - ", days, hours, mins, secs, millis, micros, nanos);
+        sprintf(&out_str[0], "%d:%02d:%02d:%02d.%03d,%03d,%03d:[%s](%s) ", days, hours, mins,
+                 secs, millis, micros, nanos, event_sev, event_sev);
+        printf(out_str);
         write(fd, out_str, strlen(out_str));
         //sprintf(out_str, event_str, entries[i + 3], entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
         //write(fd, out_str, strlen(out_str));
         sprintf(&out_str[0], "\r\n");
+        printf(out_str);
         write(fd, out_str, strlen(out_str));
     }
     return -1;
@@ -751,7 +761,7 @@ static int log_a_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd, int 
 		if (ret)
 			return -1;
 
-		if (data_fd == -1) {
+		if (data_fd == 0) {
             ret = write(fd, res.data, sizeof(*res.data) * res.hdr.count);
             if (ret < 0)
                 return ret;
