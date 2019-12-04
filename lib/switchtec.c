@@ -656,28 +656,26 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
 {
     int i;
     int SWITCHTEC_LOG_ENTRY_SIZE = 8;
-    long time, nanos, micros, millis, secs, mins, hours, days;
-    int *entries = (int *)buf;
+    unsigned int time, nanos, micros, millis, secs, mins, hours, days;
+    unsigned int *entries = (int *)buf;
+    char *event_str, *event_code, *event_sev, *out_str;
 
     for (i = 0; (i < count) && (i + SWITCHTEC_LOG_ENTRY_SIZE - 1 < count); i += SWITCHTEC_LOG_ENTRY_SIZE) {
         // Timestamp is first 2 DWORDS
         time = entries[i];
-                nanos = (int) (time % 1000);
-                time = time / 1000;
-                micros = (int) (time % 1000);
-                time = time / 1000;
-                millis = (int) (time % 1000);
-                time = time / 1000;
-                secs = (int) (time % 60);
-                time = time / 60;
-                mins = (int) (time % 60);
-                time = time / 60;
-                hours = (int) (time % 24);
-                days = (int) time / 24;
-                //String tsString = Integer.toString(days) + " " + String.format("%02d", hours)
-                  //      + ":" + String.format("%02d", min) + ":" + String.format("%02d", second)
-                    //    + "." + String.format("%03d", millis) + "," + String.format("%03d", micros)
-                      //   + "," + String.format("%03d", nanos);
+        nanos = (int) (time % 1000);
+        time = time / 1000;
+        micros = (int) (time % 1000);
+        time = time / 1000;
+        millis = (int) (time % 1000);
+        time = time / 1000;
+        secs = (int) (time % 60);
+        time = time / 60;
+        mins = (int) (time % 60);
+        time = time / 60;
+        hours = (int) (time % 24);
+        days = (int) time / 24;
+
         // Code and sev is next dword - 
         /*
         int severity = (errSevAndIds >> 28) & 0xFF;
@@ -723,9 +721,12 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
                 eventDataStr = String.format("0x%08X ", (errSevAndIds & 0xFFFFFFF));
             }
         */
-        fprintf(data_fd, "%d:%02d:%02d:%02d.%03d,%03d,%03d - [%s]", days, hours, mins, secs, millis, micros, nanos);
-        //fprintf(data_fd, event_str, entries[i + 3], entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
-        fprintf(data_fd, "\r\n");
+        sprintf(out_str, "%d:%02d:%02d:%02d.%03d,%03d,%03d - ", days, hours, mins, secs, millis, micros, nanos);
+        write(fd, out_str, strlen(out_str));
+        //sprintf(out_str, event_str, entries[i + 3], entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
+        //write(fd, out_str, strlen(out_str));
+        sprintf(out_str, "\r\n");
+        write(fd, out_str, strlen(out_str));
     }
     return -1;
 }
