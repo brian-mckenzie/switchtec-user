@@ -723,7 +723,9 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
                 eventDataStr = String.format("0x%08X ", (errSevAndIds & 0xFFFFFFF));
             }
         */
-        // final 5 are args
+        fprintf(data_fd, "%d:%02d:%02d:%02d.%03d,%03d,%03d - [%s]", days, hours, mins, secs, millis, micros, nanos);
+        //fprintf(data_fd, event_str, entries[i + 3], entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
+        fprintf(data_fd, "\r\n");
     }
     return -1;
 }
