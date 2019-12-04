@@ -659,7 +659,7 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
     unsigned long time;
     unsigned int nanos, micros, millis, secs, mins, hours, days;
     unsigned int *entries = (unsigned int *)buf;
-    char *event_str, *event_code, *event_sev;
+    char event_mod[16], event_sev[16], event_str[128];
     char out_str[128];
     unsigned int mod_id;
     unsigned int log_evt_code;
@@ -689,30 +689,28 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
 
         switch (log_sev) {
             case 5:
-                sprintf(event_sev, "LOWEST");
+                sprintf(event_sev, "LOWEST  ");
                 break;
             case 4:
-                sprintf(event_sev, "LOW");
+                sprintf(event_sev, "LOW     ");
                 break;
             case 3:
-                sprintf(event_sev, "MEDIUM");
+                sprintf(event_sev, "MEDIUM  ");
                 break;
             case 2:
-                sprintf(event_sev, "HIGH");
+                sprintf(event_sev, "HIGH    ");
                 break;
             case 1:
-                sprintf(event_sev, "HIGHEST");
+                sprintf(event_sev, "HIGHEST ");
                 break;
             case 0:
                 sprintf(event_sev, "DISABLED");
                 break;
             default:
-                sprintf(event_sev, "UNKNOWN");
+                sprintf(event_sev, "UNKNOWN ");
                 break;
         }
-        /*
-
-            String eventDataStr = "";
+        /*  String eventDataStr = "";
             int eventID = (errSevAndIds >> 16) & 0xFFF;
             int errorID = errSevAndIds & 0xFFFF;
             if (supportsParsing && manager != null) {
@@ -730,12 +728,18 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
                 eventDataStr = String.format("0x%08X ", (errSevAndIds & 0xFFFFFFF));
             }
         */
-        sprintf(&out_str[0], "%d:%02d:%02d:%02d.%03d,%03d,%03d:[%s](%s) ", days, hours, mins,
-                 secs, millis, micros, nanos, event_sev, event_sev);
+        sprintf(&event_mod[0], event_sev);
+        sprintf(&event_str[0], event_sev);
+
+        sprintf(&out_str[0], "%d:%02d:%02d:%02d.%03d,%03d,%03d|%s|%s|", days, hours, mins,
+                 secs, millis, micros, nanos, event_mod, event_sev);
         printf(out_str);
         write(fd, out_str, strlen(out_str));
-        //sprintf(out_str, event_str, entries[i + 3], entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
-        //write(fd, out_str, strlen(out_str));
+
+        sprintf(&out_str[0], event_str, entries[i + 3], entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
+        printf(out_str);
+        write(fd, out_str, strlen(out_str));
+
         sprintf(&out_str[0], "\r\n");
         printf(out_str);
         write(fd, out_str, strlen(out_str));
