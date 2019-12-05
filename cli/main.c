@@ -917,7 +917,7 @@ static int log_dump(int argc, char **argv)
 		  .help="image file to display information for"},
         {"parse", .cfg_type=CFG_FD_RD, .value_addr=&cfg.data_fd,
       		  .argument_type=optional_positional,
-      		  .force_default="osf.data",
+      		  //.force_default="osf.data",
          // required_argument,
 		  .help="parse log output using specified *.data file (APP log only)"},
 		{"type", 't', "TYPE", CFG_CHOICES, &cfg.type,

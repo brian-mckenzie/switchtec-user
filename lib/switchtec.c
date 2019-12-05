@@ -651,7 +651,7 @@ int switchtec_hard_reset(struct switchtec_dev *dev)
 	return switchtec_cmd(dev, MRPC_RESET, &subcmd, sizeof(subcmd),
 			     NULL, 0);
 }
-
+static int idx = 0;
 ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
 {
     int i;
@@ -666,9 +666,9 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
     unsigned int log_sev;
 
 
-    for (i = 0; (i < count) && (i + SWITCHTEC_LOG_ENTRY_SIZE - 1 < count); i += SWITCHTEC_LOG_ENTRY_SIZE) {
+    for (i = 0; i < count/4; i += SWITCHTEC_LOG_ENTRY_SIZE) {
         // Timestamp is first 2 DWORDS
-        time = (entries[i] << 32 | entries[i+1])*10;
+        time = ((unsigned long)(((unsigned long) entries[i] << 32) | entries[i+1]))*10UL;
         nanos = (int) (time % 1000);
         time = time / 1000;
         micros = (int) (time % 1000);
@@ -731,7 +731,7 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
         sprintf(&event_mod[0], event_sev);
         sprintf(&event_str[0], event_sev);
 
-        sprintf(&out_str[0], "%d:%02d:%02d:%02d.%03d,%03d,%03d|%s|%s|", days, hours, mins,
+        sprintf(&out_str[0], "%d|%d:%02d:%02d:%02d.%03d,%03d,%03d|%s|%s|", idx++, days, hours, mins,
                  secs, millis, micros, nanos, event_mod, event_sev);
         printf(out_str);
         write(fd, out_str, strlen(out_str));
@@ -744,7 +744,7 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
         printf(out_str);
         write(fd, out_str, strlen(out_str));
     }
-    return -1;
+    return 0;
 }
 
 static int log_a_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd, int data_fd)
