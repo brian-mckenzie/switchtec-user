@@ -905,7 +905,7 @@ static int log_dump(int argc, char **argv)
 		int out_fd;
 		const char *out_filename;
 		unsigned type;
-		int data_fd;
+		FILE *data_fd;
 	} cfg = {
 		.type = SWITCHTEC_LOG_RAM
 	};
@@ -915,10 +915,8 @@ static int log_dump(int argc, char **argv)
 		  .argument_type=optional_positional,
 		  .force_default="switchtec.log",
 		  .help="image file to display information for"},
-        {"parse", .cfg_type=CFG_FD_RD, .value_addr=&cfg.data_fd,
-      		  .argument_type=optional_positional,
-      		  //.force_default="osf.data",
-         // required_argument,
+        {"parse", .cfg_type=CFG_FILE_R, .value_addr=&cfg.data_fd,
+		  .argument_type=optional_positional,
 		  .help="parse log output using specified *.data file (APP log only)"},
 		{"type", 't', "TYPE", CFG_CHOICES, &cfg.type,
 		  required_argument,

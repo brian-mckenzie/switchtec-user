@@ -358,7 +358,7 @@ const char *switchtec_strerror(void);
 void switchtec_perror(const char *str);
 int switchtec_log_to_file(struct switchtec_dev *dev,
 			  enum switchtec_log_type type,
-			  int fd, int data_fd);
+			  int fd, FILE *data_fd);
 float switchtec_die_temp(struct switchtec_dev *dev);
 
 /**

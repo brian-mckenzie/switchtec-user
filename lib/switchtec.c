@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
+#include <regex.h>
 
 /**
  * @defgroup Device Switchtec Management
@@ -651,20 +652,93 @@ int switchtec_hard_reset(struct switchtec_dev *dev)
 	return switchtec_cmd(dev, MRPC_RESET, &subcmd, sizeof(subcmd),
 			     NULL, 0);
 }
+
 static int idx = 0;
-ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
+struct log_module {
+	char mod_name[16];
+	char events[128][512];
+};
+
+int get_mod_id_and_name(char *line, char *mod_name)
+{
+	int i;
+	char id_str[4];
+
+	for (i = 0; i < strlen(line); i++) {
+		if (line[i] == ' ') {
+			memcpy(&mod_name[0], &line[0], i);
+			break;
+		}
+	}
+	for(; i < strlen(line); i++){
+		if (line[i] == 'x') {
+			memcpy(&id_str[0], &line[i+1], 4);
+			return (int)strtoul(&id_str[0], NULL, 16);
+		}
+	}
+	return -1;
+}
+
+int read_log_data (FILE *data_fd, struct log_module *mod_list)
+{
+	char line[512], mod_name[16];
+	regex_t mod_str;
+	int ret;
+	int mod_id, evt_id;
+	fpos_t start;
+
+	memset((void *)&line[0], 0, sizeof(char)*256);
+
+	if (fgetpos(data_fd, &start) == 0){
+		ret = regcomp(&mod_str, "[A-Z_0-9]\\+[ ]\\+0x[a-zA-Z0-9]\\{4\\}[ ]\\+[0-9]\\+", 0);
+		if (ret) {
+			fprintf(stderr, "Could not compile regex\n");
+			return -1;
+		} else {
+			while (fgets(line, sizeof(line), data_fd)) {
+				/* Execute regular expression */
+				ret = regexec(&mod_str, line, 0, NULL, 0);
+				if (!ret) {
+					memset((void *)&mod_name[0], 0, sizeof(char)*16);
+					mod_id = get_mod_id_and_name(line, &mod_name[0]);
+					sprintf(&mod_list[mod_id].mod_name[0], mod_name);
+					evt_id = 0;
+					while (fgets(line, sizeof(line), data_fd)) {
+						if (line[0] == '\n' || line[0] == '\r') {
+							break;
+						} else {
+							sprintf(&mod_list[mod_id].events[evt_id++][0], "%s", line);
+						}
+					}
+				}
+			}
+			regfree(&mod_str);
+		}
+		fsetpos(data_fd, &start);
+	}
+
+	return 0;
+}
+
+ssize_t write_parsed_log(int fd, const void *buf, size_t count, FILE *data_fd)
 {
     int i;
     int SWITCHTEC_LOG_ENTRY_SIZE = 8;
     unsigned long time;
     unsigned int nanos, micros, millis, secs, mins, hours, days;
     unsigned int *entries = (unsigned int *)buf;
-    char event_mod[16], event_sev[16], event_str[128];
-    char out_str[128];
+    char event_sev[16], mod_name[16];
+    char out_str[256];
     unsigned int mod_id;
     unsigned int log_evt_code;
     unsigned int log_sev;
+    struct log_module *module_list;
 
+    module_list = (struct log_module*)malloc(sizeof(struct log_module)*256);
+
+    if (read_log_data(data_fd, module_list)) {
+    	goto err_exit;
+    }
 
     for (i = 0; i < count/4; i += SWITCHTEC_LOG_ENTRY_SIZE) {
         // Timestamp is first 2 DWORDS
@@ -689,65 +763,62 @@ ssize_t write_parsed_log(int fd, const void *buf, size_t count, int data_fd)
 
         switch (log_sev) {
             case 5:
-                sprintf(event_sev, "LOWEST  ");
+                sprintf(event_sev, "LOWEST");
                 break;
             case 4:
-                sprintf(event_sev, "LOW     ");
+                sprintf(event_sev, "LOW");
                 break;
             case 3:
-                sprintf(event_sev, "MEDIUM  ");
+                sprintf(event_sev, "MEDIUM");
                 break;
             case 2:
-                sprintf(event_sev, "HIGH    ");
+                sprintf(event_sev, "HIGH");
                 break;
             case 1:
-                sprintf(event_sev, "HIGHEST ");
+                sprintf(event_sev, "HIGHEST");
                 break;
             case 0:
                 sprintf(event_sev, "DISABLED");
                 break;
             default:
-                sprintf(event_sev, "UNKNOWN ");
+                sprintf(event_sev, "UNKNOWN");
                 break;
         }
-        /*  String eventDataStr = "";
-            int eventID = (errSevAndIds >> 16) & 0xFFF;
-            int errorID = errSevAndIds & 0xFFFF;
-            if (supportsParsing && manager != null) {
-                String errorMessage = manager.fwLogDefLookUp(eventID, errorID);
-                errorInfo.setEventID(eventID);
-                errorInfo.setErrorID(errorID);
 
-                if (errorMessage != null) {
-                    errorInfo.setErrorMessage(errorMessage);
-                } else {
-                    errorInfo.setErrorMessage("<Unknown Error ID>");
-                }
-                fwLogInfo.setEventID(errorInfo);
-            } else {
-                eventDataStr = String.format("0x%08X ", (errSevAndIds & 0xFFFFFFF));
-            }
-        */
-        sprintf(&event_mod[0], event_sev);
-        sprintf(&event_str[0], event_sev);
+        if (idx == 0) {
+            sprintf(&out_str[0], "   #|Timestamp              |Module       |Severity |Event\n");
+            printf(out_str);
+            write(fd, out_str, strlen(out_str));
+        }
 
-        sprintf(&out_str[0], "%d|%d:%02d:%02d:%02d.%03d,%03d,%03d|%s|%s|", idx++, days, hours, mins,
-                 secs, millis, micros, nanos, event_mod, event_sev);
+        if (strlen(module_list[mod_id].mod_name)){
+        	sprintf(&mod_name[0], &module_list[mod_id].mod_name[0]);
+        } else {
+        	sprintf(&mod_name[0], "???");
+        }
+
+        sprintf(&out_str[0], "%04d|%dd %02d:%02d:%02d.%03d,%03d,%03d|%-12s |%-8s |", idx++, days, hours, mins,
+                 secs, millis, micros, nanos, mod_name, event_sev);
         printf(out_str);
         write(fd, out_str, strlen(out_str));
 
-        sprintf(&out_str[0], event_str, entries[i + 3], entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
-        printf(out_str);
-        write(fd, out_str, strlen(out_str));
-
-        sprintf(&out_str[0], "\r\n");
+        if (strlen(module_list[mod_id].events[log_evt_code])){
+        	sprintf(&out_str[0], module_list[mod_id].events[log_evt_code], entries[i + 3],
+        		entries[i + 4], entries[i + 5], entries[i + 6], entries[i + 7]);
+        } else {
+        	sprintf(&out_str[0], "???\n");
+        }
         printf(out_str);
         write(fd, out_str, strlen(out_str));
     }
     return 0;
+
+err_exit:
+	free(module_list);
+	return -1;
 }
 
-static int log_a_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd, int data_fd)
+static int log_a_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd, FILE *data_fd)
 {
 	int ret;
 	int read = 0;
@@ -853,7 +924,7 @@ static int log_c_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
  */
 int switchtec_log_to_file(struct switchtec_dev *dev,
 			  enum switchtec_log_type type,
-			  int fd, int data_fd)
+			  int fd, FILE *data_fd)
 {
 	switch (type) {
 	case SWITCHTEC_LOG_RAM:
