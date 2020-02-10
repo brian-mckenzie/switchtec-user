@@ -908,7 +908,9 @@ static int log_sev(int argc, char **argv)
 
 	argconfig_parse(argc, argv, CMD_DESC_LOG_SEV, opts, &cfg, sizeof(cfg));
 
-    printf("op: %d, sev: %d, mod: %d\n");
+    printf("op: %d, sev: %d, mod: %d\n", cfg.isSet, cfg.sev, cfg.mod_id);
+
+    return 0;
 }
 
 #define CMD_DESC_LOG_DUMP "dump the firmware log to a file"
