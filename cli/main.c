@@ -876,6 +876,41 @@ static int event_wait(int argc, char **argv)
 	return 0;
 }
 
+#define CMD_DESC_LOG_SEV "Get or set firmware logging severity"
+
+static int log_sev(int argc, char **argv)
+{
+	int ret;
+
+    static struct {
+		struct switchtec_dev *dev;
+        int isSet;
+		char sev;
+		char mod_id;
+	} cfg = {
+        .isSet = 0,
+		.mod_id = 0, 
+        .sev = 0xFF
+	};
+
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+        {"op", .cfg_type = CFG_BOOL, .value_addr = &cfg.isSet,
+		  .argument_type=optional_positional,
+		  .help="operation to perform: get (0) or set (1)"},
+        {"mod", .cfg_type = CFG_BYTE, .value_addr = &cfg.mod_id,
+		  .argument_type=optional_positional,
+		  .help="module id: 0 - global, or 1 to 255 for a specific FW module"},
+        {"sev", .cfg_type = CFG_BYTE, .value_addr = &cfg.sev,
+		  .argument_type=optional_positional,
+		  .help="severity level: 0 (highest) to 5 (lowest)"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_LOG_SEV, opts, &cfg, sizeof(cfg));
+
+    printf("op: %d, sev: %d, mod: %d\n");
+}
+
 #define CMD_DESC_LOG_DUMP "dump the firmware log to a file"
 
 static int log_dump(int argc, char **argv)
@@ -2146,6 +2181,7 @@ static const struct cmd commands[] = {
 	CMD(latency, CMD_DESC_LATENCY),
 	CMD(events, CMD_DESC_EVENTS),
 	CMD(event_wait, CMD_DESC_EVENT_WAIT),
+	CMD(log_sev, CMD_DESC_LOG_SEV),
 	CMD(log_dump, CMD_DESC_LOG_DUMP),
 	CMD(test, CMD_DESC_TEST),
 	CMD(temp, CMD_DESC_TEMP),
